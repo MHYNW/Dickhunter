@@ -1,5 +1,6 @@
-"""
+# -*- coding: utf-8 -*- 
 
+"""
 Mobile robot motion planning sample with Dynamic Window Approach
 
 author: Atsushi Sakai (@Atsushi_twi), Göktuğ Karakaşlı
@@ -62,29 +63,6 @@ class Config:
         self.robot_length = 1.2  # [m] for collision check
         # obstacles [x(m) y(m), ....]
         objarry = []
-        for i in range(0, 150):
-            objarry.append([i/5, 0])
-            objarry.append([i/5, -20])
-        for i in range(0, 100):
-            objarry.append([0, -i/5])
-            objarry.append([30, -i/5])
-        for i in range(0, 125):
-            objarry.append([i/5, -10])
-        for i in range(0, 10):
-            objarry.append([28 + i/5, -10])
-            objarry.append([17, -(10 + i/5)])
-        for i in range(0, 25):
-            objarry.append([25, -(8 + i/5)])
-            objarry.append([6, -(3 + i/5)])
-        for i in range(0, 40):
-            objarry.append([28, -(8 + i/5)])
-        for i in range(0, 15):
-            objarry.append([22 + i/5, -13])
-            objarry.append([8, -i/5])
-            objarry.append([8, -(7 + i/5)])
-        for i in range(0, 30):
-            objarry.append([22 + i/5, -16])
-            objarry.append([17, -(14 + i/5)])
         objarry.append([12, -3])
         objarry.append([13, -5])
         objarry.append([12.5, -8])
@@ -115,11 +93,11 @@ def motion(x, u, dt):
     motion model
     """
 
-    x[2] += u[1] * dt
-    x[0] += u[0] * math.cos(x[2]) * dt
-    x[1] += u[0] * math.sin(x[2]) * dt
-    x[3] = u[0]
-    x[4] = u[1]
+    x[2] += u[1] * dt                       # Angle
+    x[0] += u[0] * math.cos(x[2]) * dt      # X position
+    x[1] += u[0] * math.sin(x[2]) * dt      # Y position
+    x[3] = u[0]                             # u[0], Velocity
+    x[4] = u[1]                             # u[1], Angular Velocity
 
     return x
 
@@ -209,24 +187,8 @@ def calc_obstacle_cost(trajectory, ob, config):
     dy = trajectory[:, 1] - oy[:, None]
     r = np.hypot(dx, dy)
 
-    if config.robot_type == RobotType.rectangle:
-        yaw = trajectory[:, 2]
-        rot = np.array([[np.cos(yaw), -np.sin(yaw)], [np.sin(yaw), np.cos(yaw)]])
-        rot = np.transpose(rot, [2, 0, 1])
-        local_ob = ob[:, None] - trajectory[:, 0:2]
-        local_ob = local_ob.reshape(-1, local_ob.shape[-1])
-        local_ob = np.array([local_ob @ x for x in rot])
-        local_ob = local_ob.reshape(-1, local_ob.shape[-1])
-        upper_check = local_ob[:, 0] <= config.robot_length / 2
-        right_check = local_ob[:, 1] <= config.robot_width / 2
-        bottom_check = local_ob[:, 0] >= -config.robot_length / 2
-        left_check = local_ob[:, 1] >= -config.robot_width / 2
-        if (np.logical_and(np.logical_and(upper_check, right_check),
-                           np.logical_and(bottom_check, left_check))).any():
-            return float("Inf")
-    elif config.robot_type == RobotType.circle:
-        if np.array(r <= config.robot_radius).any():
-            return float("Inf")
+    if np.array(r <= config.robot_radius).any():
+        return float("Inf")
 
     min_r = np.min(r)
     return 1.0 / min_r  # OK
@@ -275,12 +237,12 @@ def plot_robot(x, y, yaw, config):  # pragma: no cover
         plt.plot([x, out_x], [y, out_y], "-k")
 
 
-def main(gx=26.5, gy=-5, robot_type=RobotType.circle):
+def main(robot_type=RobotType.circle):
     print(__file__ + " start!!")
     # initial state [x(m), y(m), yaw(rad), v(m/s), omega(rad/s)]
     x = np.array([2.5, -5.0, 0.0, 0.0, 0.0])
     # goal position [x(m), y(m)]
-    goal1 = np.array([gx, gy])
+    goal1 = np.array([26.5, -5])
     goal2 = np.array([20, -15])
     goal3 = np.array([2.5, -15])
     # input [forward speed, yaw_rate]
