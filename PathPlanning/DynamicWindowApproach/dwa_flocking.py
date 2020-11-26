@@ -110,16 +110,38 @@ def calc_dynamic_window(x, config):
     # Dynamic window from robot specification
     Vs = [config.min_speed, config.max_speed,
           -config.max_yaw_rate, config.max_yaw_rate]
+    Vs.append([config.min_speed, config.max_speed,
+               -config.max_yaw_rate, config.max_yaw_rate])
+    Vs.append([config.min_speed, config.max_speed,
+               -config.max_yaw_rate, config.max_yaw_rate])
+    Vs.append([config.min_speed, config.max_speed,
+               -config.max_yaw_rate, config.max_yaw_rate])
+    Vs.append([config.min_speed, config.max_speed,
+               -config.max_yaw_rate, config.max_yaw_rate])
+    Vs.append([config.min_speed, config.max_speed,
+               -config.max_yaw_rate, config.max_yaw_rate])
+
 
     # Dynamic window from motion model
-    Vd = [x[3] - config.max_accel * config.dt,
-          x[3] + config.max_accel * config.dt,
-          x[4] - config.max_delta_yaw_rate * config.dt,
-          x[4] + config.max_delta_yaw_rate * config.dt]
+    Vd = [x[:, 3] - config.max_accel * config.dt,
+          x[:, 3] + config.max_accel * config.dt,
+          x[:, 4] - config.max_delta_yaw_rate * config.dt,
+          x[:, 4] + config.max_delta_yaw_rate * config.dt]
 
+    # curruently here
     #  [v_min, v_max, yaw_rate_min, yaw_rate_max]
-    dw = [max(Vs[0], Vd[0]), min(Vs[1], Vd[1]),
-          max(Vs[2], Vd[2]), min(Vs[3], Vd[3])]
+    dw = [[max(Vs[0,0], Vd[0][0]), min(Vs[0,1], Vd[0][1]),
+          max(Vs[0,2], Vd[0][2]), min(Vs[0,3], Vd[0][3])],
+          [max(Vs[1][0], Vd[1][0]), min(Vs[1][1], Vd[1][1]),
+          max(Vs[1][2], Vd[1][2]), min(Vs[1][3], Vd[1][3])],
+          [max(Vs[2][0], Vd[2][0]), min(Vs[2][1], Vd[2][1]),
+          max(Vs[2][2], Vd[2][2]), min(Vs[2][3], Vd[2][3])],
+          [max(Vs[3][0], Vd[3][0]), min(Vs[3][1], Vd[3][1]),
+          max(Vs[3][2], Vd[3][2]), min(Vs[3][3], Vd[3][3])],
+          [max(Vs[4][0], Vd[4][0]), min(Vs[4][1], Vd[4][1]),
+          max(Vs[4][2], Vd[4][2]), min(Vs[4][3], Vd[4][3])],
+          [max(Vs[5][0], Vd[5][0]), min(Vs[5][1], Vd[5][1]),
+          max(Vs[5][2], Vd[5][2]), min(Vs[5][3], Vd[5][3])]]
 
     return dw
 
@@ -240,7 +262,14 @@ def plot_robot(x, y, yaw, config):  # pragma: no cover
 def main(robot_type=RobotType.circle):
     print(__file__ + " start!!")
     # initial state [x(m), y(m), yaw(rad), v(m/s), omega(rad/s)]
-    x = np.array([2.5, -5.0, 0.0, 0.0, 0.0])
+    x = np.empty((0, 5), int)
+    x = np.append(x, np.array([[1.0, -1.0, 0.0, 0.0, 0.0]]), axis=0)
+    x = np.append(x, np.array([[1.0, -3.0, 0.0, 0.0, 0.0]]), axis=0)
+    x = np.append(x, np.array([[1.0, -5.0, 0.0, 0.0, 0.0]]), axis=0)
+    x = np.append(x, np.array([[3.0, -1.0, 0.0, 0.0, 0.0]]), axis=0)
+    x = np.append(x, np.array([[3.0, -3.0, 0.0, 0.0, 0.0]]), axis=0)
+    x = np.append(x, np.array([[3.0, -5.0, 0.0, 0.0, 0.0]]), axis=0)
+    # x = np.array([1.0, -1.0, 0.0, 0.0, 0.0])
     # goal position [x(m), y(m)]
     goal1 = np.array([26.5, -5])
     goal2 = np.array([20, -15])
