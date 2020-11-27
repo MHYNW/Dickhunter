@@ -108,8 +108,8 @@ def calc_dynamic_window(x, config):
     """
 
     # Dynamic window from robot specification
-    Vs = [config.min_speed, config.max_speed,
-          -config.max_yaw_rate, config.max_yaw_rate]
+    Vs = [[config.min_speed, config.max_speed,
+          -config.max_yaw_rate, config.max_yaw_rate]]
     Vs.append([config.min_speed, config.max_speed,
                -config.max_yaw_rate, config.max_yaw_rate])
     Vs.append([config.min_speed, config.max_speed,
@@ -120,18 +120,18 @@ def calc_dynamic_window(x, config):
                -config.max_yaw_rate, config.max_yaw_rate])
     Vs.append([config.min_speed, config.max_speed,
                -config.max_yaw_rate, config.max_yaw_rate])
-
+    print(Vs)
 
     # Dynamic window from motion model
     Vd = [x[:, 3] - config.max_accel * config.dt,
           x[:, 3] + config.max_accel * config.dt,
           x[:, 4] - config.max_delta_yaw_rate * config.dt,
           x[:, 4] + config.max_delta_yaw_rate * config.dt]
-
+    print(Vd)
     # curruently here
     #  [v_min, v_max, yaw_rate_min, yaw_rate_max]
-    dw = [[max(Vs[0,0], Vd[0][0]), min(Vs[0,1], Vd[0][1]),
-          max(Vs[0,2], Vd[0][2]), min(Vs[0,3], Vd[0][3])],
+    dw = [[max(Vs[0][0], Vd[0][0]), min(Vs[0][1], Vd[0][1]),
+          max(Vs[0][2], Vd[0][2]), min(Vs[0][3], Vd[0][3])],
           [max(Vs[1][0], Vd[1][0]), min(Vs[1][1], Vd[1][1]),
           max(Vs[1][2], Vd[1][2]), min(Vs[1][3], Vd[1][3])],
           [max(Vs[2][0], Vd[2][0]), min(Vs[2][1], Vd[2][1]),
