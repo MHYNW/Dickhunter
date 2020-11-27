@@ -88,16 +88,15 @@ class Config:
 config = Config()
 
 
-def motion(x, u, dt):
+def motion(x, n, u, dt):
     """
     motion model
     """
-
-    x[2] += u[1] * dt                       # Angle
-    x[0] += u[0] * math.cos(x[2]) * dt      # X position
-    x[1] += u[0] * math.sin(x[2]) * dt      # Y position
-    x[3] = u[0]                             # u[0], Velocity
-    x[4] = u[1]                             # u[1], Angular Velocity
+    x[n, 2] += u[1] * dt                          # Angle
+    x[n, 0] += u[0] * math.cos(x[n, 2]) * dt      # X Position
+    x[n, 1] += u[0] * math.sin(x[n, 2]) * dt      # Y Position
+    x[n, 3] = u[0]                                # u[0], Velocity
+    x[n, 4] = u[1]                                # u[1], Angular Velocity
 
     return x
 
@@ -120,15 +119,20 @@ def calc_dynamic_window(x, config):
                -config.max_yaw_rate, config.max_yaw_rate])
     Vs.append([config.min_speed, config.max_speed,
                -config.max_yaw_rate, config.max_yaw_rate])
-    print(Vs)
+    print("vs:", Vs)
+
 
     # Dynamic window from motion model
-    Vd = [x[:, 3] - config.max_accel * config.dt,
-          x[:, 3] + config.max_accel * config.dt,
-          x[:, 4] - config.max_delta_yaw_rate * config.dt,
-          x[:, 4] + config.max_delta_yaw_rate * config.dt]
-    print(Vd)
-    # curruently here
+    Vd = [[x[0, 3] - config.max_accel * config.dt,
+          x[0, 3] + config.max_accel * config.dt,
+          x[0, 4] - config.max_delta_yaw_rate * config.dt,
+          x[0, 4] + config.max_delta_yaw_rate * config.dt]]
+    for i in range(1, 6):
+        Vd.append([x[i, 3] - config.max_accel * config.dt,
+             x[i, 3] + config.max_accel * config.dt,
+             x[i, 4] - config.max_delta_yaw_rate * config.dt,
+             x[i, 4] + config.max_delta_yaw_rate * config.dt])
+    print("vd:", Vd)
     #  [v_min, v_max, yaw_rate_min, yaw_rate_max]
     dw = [[max(Vs[0][0], Vd[0][0]), min(Vs[0][1], Vd[0][1]),
           max(Vs[0][2], Vd[0][2]), min(Vs[0][3], Vd[0][3])],
@@ -143,10 +147,12 @@ def calc_dynamic_window(x, config):
           [max(Vs[5][0], Vd[5][0]), min(Vs[5][1], Vd[5][1]),
           max(Vs[5][2], Vd[5][2]), min(Vs[5][3], Vd[5][3])]]
 
+    print("dw:", dw)
+
     return dw
 
 
-def predict_trajectory(x_init, v, y, config):
+def predict_trajectory(x_init, n, v, y, config):
     """
     predict trajectory with an input
     """
@@ -155,7 +161,7 @@ def predict_trajectory(x_init, v, y, config):
     trajectory = np.array(x)
     time = 0
     while time <= config.predict_time:
-        x = motion(x, [v, y], config.dt)
+        x = motion(x, n, [v, y], config.dt)
         trajectory = np.vstack((trajectory, x))
         time += config.dt
 
@@ -169,33 +175,40 @@ def calc_control_and_trajectory(x, dw, config, goal, ob):
 
     x_init = x[:]
     min_cost = float("inf")
-    best_u = [0.0, 0.0]
+    best_u = []
+
+    for i in range(6):
+        inner = []
+        for j in range(2):
+            inner.append(0.0)
+        best_u.append(inner)
+
     best_trajectory = np.array([x])
-
     # evaluate all trajectory with sampled input in dynamic window
-    for v in np.arange(dw[0], dw[1], config.v_resolution):
-        for y in np.arange(dw[2], dw[3], config.yaw_rate_resolution):
+    for n in range(6):
+        for v in np.arange(dw[n][0], dw[n][1], config.v_resolution):
+            for y in np.arange(dw[n][2], dw[n][3], config.yaw_rate_resolution):
+                trajectory = predict_trajectory(x_init, n, v, y, config)
+                print("trajectory: ", trajectory)
+                # calc cost
+                to_goal_cost = config.to_goal_cost_gain * calc_to_goal_cost(trajectory, goal)
+                speed_cost = config.speed_cost_gain * (config.max_speed - trajectory[-1, 3])
+                ob_cost = config.obstacle_cost_gain * calc_obstacle_cost(trajectory, ob, config)
 
-            trajectory = predict_trajectory(x_init, v, y, config)
-            # calc cost
-            to_goal_cost = config.to_goal_cost_gain * calc_to_goal_cost(trajectory, goal)
-            speed_cost = config.speed_cost_gain * (config.max_speed - trajectory[-1, 3])
-            ob_cost = config.obstacle_cost_gain * calc_obstacle_cost(trajectory, ob, config)
+                final_cost = to_goal_cost + speed_cost + ob_cost
 
-            final_cost = to_goal_cost + speed_cost + ob_cost
-
-            # search minimum trajectory
-            if min_cost >= final_cost:
-                min_cost = final_cost
-                best_u = [v, y]
-                best_trajectory = trajectory
-                if abs(best_u[0]) < config.robot_stuck_flag_cons \
-                        and abs(x[3]) < config.robot_stuck_flag_cons:
-                    # to ensure the robot do not get stuck in
-                    # best v=0 m/s (in front of an obstacle) and
-                    # best omega=0 rad/s (heading to the goal with
-                    # angle difference of 0)
-                    best_u[1] = -config.max_delta_yaw_rate
+                # search minimum trajectory
+                if min_cost >= final_cost:
+                    min_cost = final_cost
+                    best_u = [v, y]
+                    best_trajectory = trajectory
+                    if abs(best_u[0]) < config.robot_stuck_flag_cons \
+                            and abs(x[n, 3]) < config.robot_stuck_flag_cons:
+                        # to ensure the robot do not get stuck in
+                        # best v=0 m/s (in front of an obstacle) and
+                        # best omega=0 rad/s (heading to the goal with
+                        # angle difference of 0)
+                        best_u[1] = -config.max_delta_yaw_rate
     return best_u, best_trajectory
 
 
