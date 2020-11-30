@@ -182,14 +182,14 @@ def calc_control_and_trajectory(x, dw, config, goal, ob):
         for j in range(2):
             inner.append(0.0)
         best_u.append(inner)
-
+    print("u: ", best_u)
     best_trajectory = np.array([x])
     # evaluate all trajectory with sampled input in dynamic window
     for n in range(6):
         for v in np.arange(dw[n][0], dw[n][1], config.v_resolution):
             for y in np.arange(dw[n][2], dw[n][3], config.yaw_rate_resolution):
                 trajectory = predict_trajectory(x_init, n, v, y, config)
-                print("trajectory: ", trajectory)
+                # print("trajectory: ", trajectory)
                 # calc cost
                 to_goal_cost = config.to_goal_cost_gain * calc_to_goal_cost(trajectory, goal)
                 speed_cost = config.speed_cost_gain * (config.max_speed - trajectory[-1, 3])
@@ -200,15 +200,15 @@ def calc_control_and_trajectory(x, dw, config, goal, ob):
                 # search minimum trajectory
                 if min_cost >= final_cost:
                     min_cost = final_cost
-                    best_u = [v, y]
+                    best_u[n] = [v, y]
                     best_trajectory = trajectory
-                    if abs(best_u[0]) < config.robot_stuck_flag_cons \
+                    if abs(best_u[n][0]) < config.robot_stuck_flag_cons \
                             and abs(x[n, 3]) < config.robot_stuck_flag_cons:
                         # to ensure the robot do not get stuck in
                         # best v=0 m/s (in front of an obstacle) and
                         # best omega=0 rad/s (heading to the goal with
                         # angle difference of 0)
-                        best_u[1] = -config.max_delta_yaw_rate
+                        best_u[n][1] = -config.max_delta_yaw_rate
     return best_u, best_trajectory
 
 
@@ -244,9 +244,11 @@ def calc_to_goal_cost(trajectory, goal):
 
 
 def plot_arrow(x, y, yaw, length=0.5, width=0.1):  # pragma: no cover
-    plt.arrow(x, y, length * math.cos(yaw), length * math.sin(yaw),
+
+    for n in range(6):
+        plt.arrow(x[n], y[n], length * math.cos(yaw[n]), length * math.sin(yaw[n]),
               head_length=width, head_width=width)
-    plt.plot(x, y)
+        plt.plot(x, y)
 
 
 def plot_robot(x, y, yaw, config):  # pragma: no cover
@@ -295,7 +297,9 @@ def main(robot_type=RobotType.circle):
     # goal 1
     while True:
         u, predicted_trajectory = dwa_control(x, config, goal1, ob)
-        x = motion(x, u, config.dt)  # simulate robot
+        for n in range(6):
+            x = motion(x, n, u[n], config.dt)  # simulate robot
+        # x = motion(x, n, u[n], config.dt)  # simulate robot
         trajectory = np.vstack((trajectory, x))  # store state history
 
         if show_animation:
@@ -305,21 +309,23 @@ def main(robot_type=RobotType.circle):
                 'key_release_event',
                 lambda event: [exit(0) if event.key == 'escape' else None])
             plt.plot(predicted_trajectory[:, 0], predicted_trajectory[:, 1], "-g")
-            plt.plot(x[0], x[1], "xr")
+            plt.plot(x[:, 0], x[:, 1], "xr")
             plt.plot(goal1[0], goal1[1], "xb")
             plt.plot(ob[:, 0], ob[:, 1], "ok")
-            plot_robot(x[0], x[1], x[2], config)
-            plot_arrow(x[0], x[1], x[2])
+            plot_robot(x[:, 0], x[:, 1], x[:, 2], config)
+            plot_arrow(x[:, 0], x[:, 1], x[:, 2])
             plt.axis("equal")
             plt.grid(True)
             plt.pause(0.0001)
 
         # check reaching goal
-        dist_to_goal = math.hypot(x[0] - goal1[0], x[1] - goal1[1])
-        if dist_to_goal <= config.robot_radius:
-            print("Goal!!")
-            break
-    
+        for n in range(6):
+            dist_to_goal = math.hypot(x[n, 0] - goal1[0], x[n, 1] - goal1[1])
+            if dist_to_goal <= config.robot_radius:
+                print("Goal!!")
+                break
+
+
     # goal 2
     while True:
         u, predicted_trajectory = dwa_control(x, config, goal2, ob)
